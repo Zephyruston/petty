@@ -25,8 +25,8 @@ async fn main() -> Result<()> {
     run_ui(&mut pet).await?;
 
     // Handle post-run state
-    if pet.status == PetStatus::Abandoned {
-        // If pet was abandoned, delete the state to start fresh next time
+    if pet.status == PetStatus::Abandoned || pet.health == 0 {
+        // If pet was abandoned or died, delete the state to start fresh next time
         delete_state()?;
     } else {
         // Otherwise, update last_seen and save

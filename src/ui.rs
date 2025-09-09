@@ -84,13 +84,28 @@ pub async fn run_ui(pet: &mut Pet) -> Result<()> {
                         pet.cleanliness = pet.cleanliness.saturating_sub(3);
 
                         // Health decreases if stats are poor
-                        if pet.hunger > 80 {
+                        // More nuanced health decline based on severity
+                        if pet.hunger > 90 {
+                            pet.health = pet.health.saturating_sub(3);
+                        } else if pet.hunger > 80 {
+                            pet.health = pet.health.saturating_sub(2);
+                        } else if pet.hunger > 70 {
                             pet.health = pet.health.saturating_sub(1);
                         }
-                        if pet.cleanliness < 20 {
+
+                        if pet.cleanliness < 10 {
+                            pet.health = pet.health.saturating_sub(3);
+                        } else if pet.cleanliness < 20 {
+                            pet.health = pet.health.saturating_sub(2);
+                        } else if pet.cleanliness < 30 {
                             pet.health = pet.health.saturating_sub(1);
                         }
-                        if pet.mood < 20 {
+
+                        if pet.mood < 10 {
+                            pet.health = pet.health.saturating_sub(3);
+                        } else if pet.mood < 20 {
+                            pet.health = pet.health.saturating_sub(2);
+                        } else if pet.mood < 30 {
                             pet.health = pet.health.saturating_sub(1);
                         }
 
@@ -103,6 +118,16 @@ pub async fn run_ui(pet: &mut Pet) -> Result<()> {
                         } else if pet.age > 20 {
                             // Adult pet - normal health decline
                             // No additional effect
+                        }
+
+                        // Check for sickness when health is low
+                        if pet.health < 20 && pet.status == PetStatus::Alive {
+                            pet.status = PetStatus::Sick;
+                        }
+
+                        // Check for death when health is extremely low
+                        if pet.health == 0 {
+                            // Pet dies - we'll handle this in the UI
                         }
                     }
                 }
@@ -208,6 +233,24 @@ fn ui(frame: &mut Frame, pet: &Pet) {
         return;
     }
 
+    // Check if pet is dead
+    if pet.health == 0 {
+        let message = vec![
+            Line::from(""),
+            Line::from("你的宠物已经离开了..."),
+            Line::from(""),
+            Line::from(Span::styled(
+                "按 'q' 或 'ctrl-c' 退出，下次启动将开始新的旅程。",
+                Style::default().add_modifier(Modifier::ITALIC),
+            )),
+        ];
+        let paragraph = Paragraph::new(message)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
+        frame.render_widget(paragraph, frame.area());
+        return;
+    }
+
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -229,6 +272,15 @@ fn ui(frame: &mut Frame, pet: &Pet) {
             r"     ( o_o )",
             r"     > ^ <",
             "别再戳我了，我在休假！",
+        ]
+    } else if pet.status == PetStatus::Sick {
+        // Sick pet
+        vec![
+            "",
+            r"     /\_/\",
+            r"     ( x_x )",
+            r"     > ^ <",
+            "生病了...",
         ]
     } else if pet.is_sleeping {
         vec![
