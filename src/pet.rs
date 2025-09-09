@@ -56,6 +56,13 @@ impl Pet {
         self.is_sleeping = !self.is_sleeping;
     }
 
+    pub fn train(&mut self) {
+        // Training increases health and mood but consumes energy (increases hunger)
+        self.health = self.health.saturating_add(3);
+        self.mood = self.mood.saturating_add(5);
+        self.hunger = self.hunger.saturating_add(10);
+    }
+
     pub fn life_stage(&self) -> &'static str {
         if self.age > 50 {
             "elderly"
@@ -246,5 +253,25 @@ mod tests {
         assert_eq!(pet.hunger, 56);
         assert_eq!(pet.cleanliness, 41);
         assert_eq!(pet.mood, 30);
+    }
+
+    #[test]
+    fn test_train() {
+        let mut pet = Pet::new("TrainPet".to_string());
+        let initial_health = pet.health;
+        let initial_mood = pet.mood;
+        let initial_hunger = pet.hunger;
+
+        pet.train();
+
+        assert_eq!(pet.health, initial_health + 3);
+        assert_eq!(pet.mood, initial_mood + 5);
+        assert_eq!(pet.hunger, initial_hunger + 10);
+    }
+
+    #[test]
+    fn test_custom_name() {
+        let pet = Pet::new("Fluffy".to_string());
+        assert_eq!(pet.name, "Fluffy");
     }
 }

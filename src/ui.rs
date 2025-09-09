@@ -31,6 +31,60 @@ fn suspend_and_restore() {
     stdout.execute(EnterAlternateScreen).ok();
 }
 
+fn show_help_screen(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<()> {
+    loop {
+        terminal.draw(|f| {
+            let help_text = vec![
+                Line::from(""),
+                Line::from("Petty - 终端电子宠物 帮助信息"),
+                Line::from(""),
+                Line::from("基本操作:"),
+                Line::from("  f - 喂食 (降低饥饿度, 稍微增加健康值)"),
+                Line::from("  w - 洗澡 (提高清洁度到最大值)"),
+                Line::from("  p - 玩耍 (提高心情, 但会增加饥饿度)"),
+                Line::from("  t - 训练 (提高健康值和心情, 但会大幅增加饥饿度)"),
+                Line::from("  s - 睡觉 (切换睡眠状态, 睡眠时会恢复健康值)"),
+                Line::from(""),
+                Line::from("其他操作:"),
+                Line::from("  ? 或 help - 显示此帮助信息"),
+                Line::from("  debug - 进入开发者模式"),
+                Line::from("  Ctrl+Z - 挂起程序到后台"),
+                Line::from("  fg - 恢复挂起的程序"),
+                Line::from("  q 或 Ctrl+C - 退出程序"),
+                Line::from(""),
+                Line::from("状态说明:"),
+                Line::from("  年龄: 宠物的年龄, 每5分钟增长1岁"),
+                Line::from("  健康: 宠物的健康状况, 受其他状态影响"),
+                Line::from("  饥饿: 饥饿度会随时间增加, 过高会影响健康"),
+                Line::from("  清洁: 清洁度会随时间减少, 过低会影响健康"),
+                Line::from("  心情: 心情会随时间减少, 过低会影响健康"),
+                Line::from(""),
+                Line::from("提示:"),
+                Line::from("  - 宠物需要定期照顾以保持健康"),
+                Line::from("  - 老年宠物需要更多的关注和照顾"),
+                Line::from("  - 长时间不照顾宠物会导致宠物生病甚至死亡"),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "按任意键返回游戏",
+                    Style::default().add_modifier(Modifier::ITALIC),
+                )),
+            ];
+
+            let paragraph = Paragraph::new(help_text)
+                .alignment(Alignment::Left)
+                .wrap(Wrap { trim: true });
+            f.render_widget(paragraph, f.area());
+        })?;
+
+        // Wait for any key press
+        if let Event::Key(_) = event::read()? {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn run_ui(pet: &mut Pet) -> Result<()> {
     // setup terminal
     crossterm::terminal::enable_raw_mode()?;
@@ -169,6 +223,11 @@ pub async fn run_ui(pet: &mut Pet) -> Result<()> {
                                 if input_buffer.ends_with("debug") {
                                     pet.debug_mode = true;
                                     input_buffer.clear();
+                                } else if input_buffer.ends_with("?") || input_buffer.ends_with("help") {
+                                    // Show help screen
+                                    show_help_screen(&mut terminal)?;
+                                    input_buffer.clear();
+                                    continue;
                                 }
                             } else {
                                 input_buffer.clear();
@@ -197,6 +256,13 @@ pub async fn run_ui(pet: &mut Pet) -> Result<()> {
                                     // Elderly pets get tired more easily
                                     if pet.life_stage() == "elderly" {
                                         pet.health = pet.health.saturating_sub(3);
+                                    }
+                                },
+                                KeyCode::Char('t') => {
+                                    pet.train();
+                                    // Elderly pets get tired more easily from training
+                                    if pet.life_stage() == "elderly" {
+                                        pet.health = pet.health.saturating_sub(2);
                                     }
                                 },
                                 KeyCode::Char('s') => pet.sleep(),
@@ -329,17 +395,26 @@ fn ui(frame: &mut Frame, pet: &Pet) {
     let stats_layout = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([Constraint::Length(1); 6].as_ref())
+        .constraints([Constraint::Length(1); 7].as_ref())
         .split(top_layout[1]);
 
     let stats_view = Block::default().title("Stats").borders(Borders::ALL);
 
     let name = Paragraph::new(format!("Name: {}", pet.name));
-    let age = Paragraph::new(format!("Age: {}", pet.age));
-    let health = Paragraph::new(format!("Health: {}", pet.health));
+    let age = Paragraph::new(format!("Age: {} ({})", pet.age, pet.life_stage()));
+    let health_text = match pet.status {
+        PetStatus::Sick => format!("Health: {} (生病)", pet.health),
+        PetStatus::Abandoned => format!("Health: {} (被遗弃)", pet.health),
+        _ => format!("Health: {}", pet.health),
+    };
+    let health = Paragraph::new(health_text);
     let hunger = Paragraph::new(format!("Hunger: {}", pet.hunger));
     let cleanliness = Paragraph::new(format!("Cleanliness: {}", pet.cleanliness));
     let mood = Paragraph::new(format!("Mood: {}", pet.mood));
+    let status = Paragraph::new(format!(
+        "Status: {}",
+        if pet.is_sleeping { "Sleeping" } else { "Awake" }
+    ));
 
     frame.render_widget(stats_view, top_layout[1]);
     frame.render_widget(name, stats_layout[0]);
@@ -348,12 +423,13 @@ fn ui(frame: &mut Frame, pet: &Pet) {
     frame.render_widget(hunger, stats_layout[3]);
     frame.render_widget(cleanliness, stats_layout[4]);
     frame.render_widget(mood, stats_layout[5]);
+    frame.render_widget(status, stats_layout[6]);
 
     let hints = if pet.debug_mode {
         Paragraph::new(" [Debug Mode] (h/j) Hunger | (m/n) Mood | (c/v) Cleanliness | (Esc) Exit ")
             .alignment(Alignment::Center)
     } else {
-        Paragraph::new(" (f)eed | (w)ash | (p)lay | (s)leep | (q)uit | ctrl-c | ctrl-z ")
+        Paragraph::new(" (f)eed | (w)ash | (p)lay | (t)rain | (s)leep | (q)uit | ctrl-c | ctrl-z ")
             .alignment(Alignment::Center)
     };
     frame.render_widget(hints, main_layout[1]);

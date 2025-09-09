@@ -6,13 +6,22 @@ use anyhow::Result;
 use chrono::Utc;
 use pet::{Pet, PetStatus};
 use state::{delete_state, load_state, save_state};
+use std::env;
 use ui::run_ui;
 
 const ABANDON_SECONDS: i64 = 3 * 24 * 60 * 60; // 3 days
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut pet = load_state().unwrap_or_else(|_| Pet::new("Petty".to_string()));
+    // Parse command line arguments for pet name
+    let args: Vec<String> = env::args().collect();
+    let pet_name = if args.len() > 1 {
+        args[1].clone()
+    } else {
+        "Petty".to_string()
+    };
+
+    let mut pet = load_state().unwrap_or_else(|_| Pet::new(pet_name));
 
     // Check for abandonment and calculate elapsed time effects
     let now = Utc::now();
