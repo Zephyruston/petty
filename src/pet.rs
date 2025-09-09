@@ -54,4 +54,80 @@ impl Pet {
     pub fn sleep(&mut self) {
         self.is_sleeping = !self.is_sleeping;
     }
+
+    pub fn life_stage(&self) -> &'static str {
+        if self.age > 50 {
+            "elderly"
+        } else if self.age > 20 {
+            "adult"
+        } else {
+            "young"
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pet_creation() {
+        let pet = Pet::new("TestPet".to_string());
+        assert_eq!(pet.name, "TestPet");
+        assert_eq!(pet.age, 0);
+        assert_eq!(pet.health, 100);
+    }
+
+    #[test]
+    fn test_life_stage() {
+        let mut pet = Pet::new("TestPet".to_string());
+
+        // Test young pet
+        pet.age = 10;
+        assert_eq!(pet.life_stage(), "young");
+
+        // Test adult pet
+        pet.age = 30;
+        assert_eq!(pet.life_stage(), "adult");
+
+        // Test elderly pet
+        pet.age = 60;
+        assert_eq!(pet.life_stage(), "elderly");
+    }
+
+    #[test]
+    fn test_feed() {
+        let mut pet = Pet::new("TestPet".to_string());
+        pet.hunger = 50;
+        pet.feed();
+        assert_eq!(pet.hunger, 30);
+    }
+
+    #[test]
+    fn test_wash() {
+        let mut pet = Pet::new("TestPet".to_string());
+        pet.cleanliness = 50;
+        pet.wash();
+        assert_eq!(pet.cleanliness, 100);
+    }
+
+    #[test]
+    fn test_play() {
+        let mut pet = Pet::new("TestPet".to_string());
+        let initial_hunger = pet.hunger;
+        let initial_mood = pet.mood;
+        pet.play();
+        assert_eq!(pet.mood, initial_mood + 10);
+        assert_eq!(pet.hunger, initial_hunger + 5);
+    }
+
+    #[test]
+    fn test_sleep() {
+        let mut pet = Pet::new("TestPet".to_string());
+        assert!(!pet.is_sleeping);
+        pet.sleep();
+        assert!(pet.is_sleeping);
+        pet.sleep();
+        assert!(!pet.is_sleeping);
+    }
 }

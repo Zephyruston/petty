@@ -71,6 +71,10 @@ pub async fn run_ui(pet: &mut Pet) -> Result<()> {
 
                 if pet.is_sleeping {
                     pet.health = pet.health.saturating_add(1);
+                    // Elderly pets heal slower
+                    if pet.life_stage() == "elderly" {
+                        pet.health = pet.health.saturating_sub(1);
+                    }
                 } else {
                     if pet.mood > 0 {
                         pet.mood = pet.mood.saturating_sub(2); // Mood drops faster
@@ -88,6 +92,17 @@ pub async fn run_ui(pet: &mut Pet) -> Result<()> {
                         }
                         if pet.mood < 20 {
                             pet.health = pet.health.saturating_sub(1);
+                        }
+
+                        // Age affects health decline - older pets decline faster
+                        if pet.age > 50 {
+                            // Elderly pet - health declines faster
+                            if pet.hunger > 60 || pet.cleanliness < 40 || pet.mood < 40 {
+                                pet.health = pet.health.saturating_sub(1);
+                            }
+                        } else if pet.age > 20 {
+                            // Adult pet - normal health decline
+                            // No additional effect
                         }
                     }
                 }
@@ -138,9 +153,27 @@ pub async fn run_ui(pet: &mut Pet) -> Result<()> {
                                 continue;
                             }
                             match key.code {
-                                KeyCode::Char('f') => pet.feed(),
-                                KeyCode::Char('w') => pet.wash(),
-                                KeyCode::Char('p') => pet.play(),
+                                KeyCode::Char('f') => {
+                                    pet.feed();
+                                    // Elderly pets get less benefit from feeding
+                                    if pet.life_stage() == "elderly" {
+                                        pet.health = pet.health.saturating_sub(2);
+                                    }
+                                },
+                                KeyCode::Char('w') => {
+                                    pet.wash();
+                                    // Elderly pets get stressed from washing
+                                    if pet.life_stage() == "elderly" {
+                                        pet.mood = pet.mood.saturating_sub(5);
+                                    }
+                                },
+                                KeyCode::Char('p') => {
+                                    pet.play();
+                                    // Elderly pets get tired more easily
+                                    if pet.life_stage() == "elderly" {
+                                        pet.health = pet.health.saturating_sub(3);
+                                    }
+                                },
                                 KeyCode::Char('s') => pet.sleep(),
                                 _ => {}
                             }
@@ -205,21 +238,36 @@ fn ui(frame: &mut Frame, pet: &Pet) {
             r"      > ^ <",
             "",
         ]
-    } else if pet.mood < 20 {
-        // Sad pet
-        vec!["", r"     /\_/\", r"     ( T.T )", r"     > ^ <", ""]
-    } else if pet.hunger > 60 {
-        // Hungry pet
-        vec!["", r"     /\_/\", r"     ( o_o )", r"     > ^ <", ""]
-    } else if pet.cleanliness < 40 {
-        // Dirty pet
-        vec!["", r"     /\_/\", r"     ( >.< )", r"     > ^ <", ""]
-    } else if pet.mood > 80 {
-        // Happy pet
-        vec!["", r"     /\_/\", r"     ( ^.^ )", r"     > ^ <", ""]
     } else {
-        // Neutral pet
-        vec!["", r"     /\_/\", r"     ( o.o )", r"     > ^ <", ""]
+        match pet.life_stage() {
+            "elderly" => {
+                // Elderly pet
+                vec!["", r"     /\_/\", r"     ( -_- )", r"     > v <", ""]
+            }
+            "adult" => {
+                // Adult pet
+                vec!["", r"     /\_/\", r"     ( ._. )", r"     > ^ <", ""]
+            }
+            _ => {
+                // Young pet
+                if pet.mood < 20 {
+                    // Sad pet
+                    vec!["", r"     /\_/\", r"     ( T.T )", r"     > ^ <", ""]
+                } else if pet.hunger > 60 {
+                    // Hungry pet
+                    vec!["", r"     /\_/\", r"     ( o_o )", r"     > ^ <", ""]
+                } else if pet.cleanliness < 40 {
+                    // Dirty pet
+                    vec!["", r"     /\_/\", r"     ( >.< )", r"     > ^ <", ""]
+                } else if pet.mood > 80 {
+                    // Happy pet
+                    vec!["", r"     /\_/\", r"     ( ^.^ )", r"     > ^ <", ""]
+                } else {
+                    // Neutral young pet
+                    vec!["", r"     /\_/\", r"     ( o.o )", r"     > ^ <", ""]
+                }
+            }
+        }
     };
     let pet_art = Paragraph::new(pet_art_lines.join("\n")).alignment(Alignment::Center);
 
